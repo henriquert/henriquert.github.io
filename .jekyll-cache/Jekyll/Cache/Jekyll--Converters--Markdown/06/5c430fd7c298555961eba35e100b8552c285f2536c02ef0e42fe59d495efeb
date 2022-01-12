@@ -1,0 +1,599 @@
+I"Qu<h1 id="análise-exploratória-das-músicas-brasileiras-por-década">Análise exploratória das músicas brasileiras por década</h1>
+<p>Henrique Reichert
+27/10/2021</p>
+
+<h2 id="introdução">Introdução</h2>
+
+<p>Ao longo das últimas décadas, o Brasil passou por diversos cenários
+políticos e econômicos que acabam afetando a sociedade e se refletindo
+na cultura de nosso país. Ao longo das décadas de 60 a 80, a ditadura
+militar foi um dos eventos que estimulou mudanças no ritmo e nas letras
+das músicas brasileiras. Já nas décadas mais atuais, um outro cenário
+impera e também altera a forma com que consumimos áudio.</p>
+
+<p>Para avaliar como ocorreu esta evolução da música brasileira ao longo
+das décadas, este código analisa algumas variáveis típicas da sonoridade
+dos aúdios e também a composição das letras das músicas.</p>
+
+<p>Seguiremos este documento com o download dos dados do Spotify, em que se
+avaliam algumas estatísticas disponibilizadas pelo próprio API da
+empresa.</p>
+
+<p>Em seguida, faremos a seleção das músicas por década e o download das
+letras destas músicas, usando um API da Vagalume. Nesta etapa será
+preciso um trabalho de limpeza dos dados e conexão dos dados obtidos
+pelo Spotify e pelo Vagalume.</p>
+
+<p>Por fim, faremos uma análise de sentimentos das músicas e observação das
+palavras mais usadas em cada uma das décadas da música brasileira.</p>
+
+<h2 id="carregamento-de-pacotes-e-download-dos-dados-do-spotify">Carregamento de pacotes e download dos dados do Spotify</h2>
+
+<p>Os pacotes básicos para esta etapa são os seguintes:</p>
+
+<ul>
+  <li>Tidyverse, para manipulação dos dados</li>
+  <li>Spotifyr, para download das estatísticas do Spotify</li>
+  <li>Ggridges, para gráficos</li>
+</ul>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#Carregando pacotes básicos</span><span class="w">
+
+</span><span class="n">library</span><span class="p">(</span><span class="n">tidyverse</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">spotifyr</span><span class="p">)</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">ggridges</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Agora será preciso obter as credenciais para acesso ao API do Spotify.
+Para isso, é preciso ter um cadastro na plataforma e acessar o site
+(<a href="https://developer.spotify.com/">https://developer.spotify.com/</a>). Nele, você clica em ‘Dashboard’ e em
+‘Create an App’, coloque o nome e descrição que achar mais adequado e
+tenha acesso a sua Cliente ID e Client Secret.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#Definindo minha ID do API do Spotify</span><span class="w">
+
+</span><span class="n">Sys.setenv</span><span class="p">(</span><span class="n">SPOTIFY_CLIENT_ID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'XXXXXXXXXXXXXXXXXX'</span><span class="p">)</span><span class="w"> </span><span class="c1">#Insira sua Client ID</span><span class="w">
+</span><span class="n">Sys.setenv</span><span class="p">(</span><span class="n">SPOTIFY_CLIENT_SECRET</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'XXXXXXXXXXXXXXXXXX'</span><span class="p">)</span><span class="w"> </span><span class="c1">#Insira sua Client Secret</span><span class="w">
+
+</span><span class="n">access_token</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">get_spotify_access_token</span><span class="p">()</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Existem várias formas de obter os dados do Spotify, a documentação
+consta no site mencionado acima. No nosso caso, queremos fazer o
+download das músicas por playlist, sendo neste caso as playlists criadas
+pelo próprio Spotify e referente às principais músicas de cada década.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#Definindo o autor das playlists, no caso é o próprio spotify</span><span class="w">
+</span><span class="n">playlist_username</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s1">'spotify'</span><span class="w">
+
+</span><span class="c1">#Definindo as URIs das playlists que queremos</span><span class="w">
+</span><span class="n">playlist_uris</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s1">'37i9dQZF1DWZc0bJQiqY20'</span><span class="p">,</span><span class="w"> </span><span class="c1">#Brasil Anos 50</span><span class="w">
+                   </span><span class="s1">'37i9dQZF1DX1Qj33psNIU5'</span><span class="p">,</span><span class="w"> </span><span class="c1">#Brasil Anos 60</span><span class="w">
+                   </span><span class="s1">'37i9dQZF1DXaI4UKLLl2Z7'</span><span class="p">,</span><span class="w"> </span><span class="c1">#Brasil Anos 70</span><span class="w">
+                   </span><span class="s1">'37i9dQZF1DWVRje2pMSCzM'</span><span class="p">,</span><span class="w"> </span><span class="c1">#Brasil Anos 80</span><span class="w">
+                   </span><span class="s1">'37i9dQZF1DX7v47Gt49bv4'</span><span class="p">,</span><span class="w"> </span><span class="c1">#Brasil Anos 90</span><span class="w">
+                   </span><span class="s1">'37i9dQZF1DWZ2DWnNKZTXs'</span><span class="p">,</span><span class="w"> </span><span class="c1">#Brasil Anos 2000</span><span class="w">
+                   </span><span class="s1">'37i9dQZF1DWUXCP3AaoWLP'</span><span class="p">,</span><span class="w"> </span><span class="c1">#Brasil Anos 2010</span><span class="w">
+                   </span><span class="s1">'37i9dQZF1DX0FOF1IUWK1W'</span><span class="p">)</span><span class="w"> </span><span class="c1">#Top Brasil, como proxy para músicas atuais de 2020</span><span class="w">
+
+</span><span class="c1">#Baixando os dados e deixando apenas as colunas de interesse para essa análise</span><span class="w">
+
+</span><span class="n">playlist_audio_features</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">get_playlist_audio_features</span><span class="p">(</span><span class="n">playlist_username</span><span class="p">,</span><span class="w"> </span><span class="n">playlist_uris</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">select</span><span class="p">(</span><span class="s1">'playlist_name'</span><span class="p">,</span><span class="s1">'danceability'</span><span class="p">,</span><span class="s1">'energy'</span><span class="p">,</span><span class="s1">'loudness'</span><span class="p">,</span><span class="s1">'speechiness'</span><span class="p">,</span><span class="s1">'acousticness'</span><span class="p">,</span><span class="w">
+         </span><span class="s1">'instrumentalness'</span><span class="p">,</span><span class="s1">'valence'</span><span class="p">,</span><span class="s1">'tempo'</span><span class="p">,</span><span class="s1">'track.name'</span><span class="p">,</span><span class="s1">'track.popularity'</span><span class="p">,</span><span class="s1">'track.id'</span><span class="p">,</span><span class="w"> </span><span class="s1">'track.artists'</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="análise-das-músicas-por-década">Análise das músicas por década</h2>
+
+<p>Com os dados das músicas por década, podemos avaliar algumas diferenças
+da musicalidade a partir de estatísticas preparadas pelo próprio
+Spotify, são elas:</p>
+
+<ul>
+  <li>Danceability, o quão dançável é a música, com base no ritmo, batidas
+por minuto e outros dados, varia de 0 a 1.</li>
+  <li>Energy, representa a intensidade e atividade da música, um rock
+pesado tem alta energia, por exemplo, varia de 0 a 1 também.</li>
+  <li>Loudness, é a média de decibeis que a música alcança, são músicas
+mais barulhentas e os valores variam entre -60 e 0 db.</li>
+  <li>Acousticness, um índice de 0 a 1 para avaliar se a música é
+acústica.</li>
+  <li>Valence, valor de 0 a 1 que representa a positividade da música,
+valores mais próximos de 1 são músicas mais felizes e eufóricas, do
+ponto de vista da sonoridade, e não da letra.</li>
+  <li>Tempo, representa as batidas por minuto (BPM) da música.</li>
+</ul>
+
+<p>Um detalhe importante é que o Spotify gera arquivos de apenas 50 músicas
+por vez. Neste caso, achamos razoável comparar as 50 principais músicas
+de cada década, então mantemos assim mesmo, trabalhando com 50 músicas
+para 8 playlists, resultando em 400 músicas.</p>
+
+<p>Explicadas as variáveis, podemos avaliar em gráficos de histograma como
+se configuram as músicas nas décadas.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#Renomeando as playlists para ficarem na ordem correta de visualização</span><span class="w">
+
+
+</span><span class="n">playlist_audio_features</span><span class="p">[</span><span class="w">
+  </span><span class="n">playlist_audio_features</span><span class="o">$</span><span class="n">playlist_name</span><span class="o">==</span><span class="s1">'Top Brasil'</span><span class="p">,</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"Brasil Anos 2020"</span><span class="w">
+</span><span class="n">playlist_audio_features</span><span class="p">[</span><span class="w">
+  </span><span class="n">playlist_audio_features</span><span class="o">$</span><span class="n">playlist_name</span><span class="o">==</span><span class="s1">'Brasil Anos 90'</span><span class="p">,</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"Brasil Anos 1990"</span><span class="w">
+</span><span class="n">playlist_audio_features</span><span class="p">[</span><span class="w">
+  </span><span class="n">playlist_audio_features</span><span class="o">$</span><span class="n">playlist_name</span><span class="o">==</span><span class="s1">'Brasil Anos 80'</span><span class="p">,</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"Brasil Anos 1980"</span><span class="w">
+</span><span class="n">playlist_audio_features</span><span class="p">[</span><span class="w">
+  </span><span class="n">playlist_audio_features</span><span class="o">$</span><span class="n">playlist_name</span><span class="o">==</span><span class="s1">'Brasil Anos 70'</span><span class="p">,</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"Brasil Anos 1970"</span><span class="w">
+</span><span class="n">playlist_audio_features</span><span class="p">[</span><span class="w">
+  </span><span class="n">playlist_audio_features</span><span class="o">$</span><span class="n">playlist_name</span><span class="o">==</span><span class="s1">'Brasil Anos 60'</span><span class="p">,</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"Brasil Anos 1960"</span><span class="w">
+</span><span class="n">playlist_audio_features</span><span class="p">[</span><span class="w">
+  </span><span class="n">playlist_audio_features</span><span class="o">$</span><span class="n">playlist_name</span><span class="o">==</span><span class="s1">'Brasil Anos 50'</span><span class="p">,</span><span class="m">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"Brasil Anos 1950"</span><span class="w">
+</span><span class="c1">#As playlists de 2000 e 2010 não precisam ser renomeadas.</span><span class="w">
+
+
+
+</span><span class="c1">#Plotando gráficos comparativos das músicas das décadas</span><span class="w">
+
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">playlist_audio_features</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">valence</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_density_ridges</span><span class="p">(</span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">jittered_points</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_ridges</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="n">axis.title.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+                         </span><span class="n">axis.title.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">guides</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ggtitle</span><span class="p">(</span><span class="s2">"Valência das músicas por década"</span><span class="p">)</span><span class="w">
+
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">playlist_audio_features</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">danceability</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_density_ridges</span><span class="p">(</span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">jittered_points</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_ridges</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="n">axis.title.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+                         </span><span class="n">axis.title.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">guides</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ggtitle</span><span class="p">(</span><span class="s2">"Dançabilidade das músicas por década"</span><span class="p">)</span><span class="w">
+
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">playlist_audio_features</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">energy</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_density_ridges</span><span class="p">(</span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">jittered_points</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_ridges</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="n">axis.title.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+                         </span><span class="n">axis.title.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">guides</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ggtitle</span><span class="p">(</span><span class="s2">"Energia das músicas por década"</span><span class="p">)</span><span class="w">
+
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">playlist_audio_features</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loudness</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_density_ridges</span><span class="p">(</span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">jittered_points</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_ridges</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="n">axis.title.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+                         </span><span class="n">axis.title.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">guides</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ggtitle</span><span class="p">(</span><span class="s2">"Loudness das músicas por década"</span><span class="p">)</span><span class="w">
+
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">playlist_audio_features</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">acousticness</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_density_ridges</span><span class="p">(</span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">jittered_points</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_ridges</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="n">axis.title.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+                         </span><span class="n">axis.title.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">guides</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ggtitle</span><span class="p">(</span><span class="s2">"Acústico das músicas por década"</span><span class="p">)</span><span class="w">
+
+</span><span class="n">ggplot</span><span class="p">(</span><span class="n">playlist_audio_features</span><span class="p">,</span><span class="w"> </span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tempo</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">,</span><span class="w">
+                                    </span><span class="n">fill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_density_ridges</span><span class="p">(</span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.5</span><span class="p">,</span><span class="w"> </span><span class="n">jittered_points</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_ridges</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">theme</span><span class="p">(</span><span class="n">axis.title.x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">(),</span><span class="w">
+                         </span><span class="n">axis.title.y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element_blank</span><span class="p">())</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">guides</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">ggtitle</span><span class="p">(</span><span class="s2">"Tempo (BPM) das músicas por década"</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="download-das-letras-das-músicas">Download das letras das músicas</h2>
+
+<p>Aparentemente, há uma diferença notável nas letras das músicas mais
+antigas com as atuais. Para avaliar esta diferença com mais embasamento
+em dados, vamos fazer o download das letras destas músicas para poder
+comparar as décadas.</p>
+
+<p>Para esta etapa, vamos precisar de alguns pacotes adicionais e do
+registro ao API do Vagalume.</p>
+
+<p>Para o registro da API, é preciso seguir as etapas abaixo:</p>
+
+<ul>
+  <li>Acessar o site <a href="https://auth.vagalume.com.br/">https://auth.vagalume.com.br/</a> e fazer o cadastro,</li>
+  <li>Entrar na área de APIs
+(<a href="https://auth.vagalume.com.br/settings/api/">https://auth.vagalume.com.br/settings/api/</a>) e criar um novo
+aplicativo,</li>
+  <li>Salvar a credencial do aplicativo.</li>
+</ul>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Pacotes adicionais necessários</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="s1">'vagalumeR'</span><span class="p">)</span><span class="w"> </span><span class="c1"># Para download dos dados</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="s1">'bitsandends'</span><span class="p">)</span><span class="w"> </span><span class="c1"># Para realizar aproximações de nomes e artistas</span><span class="w">
+
+</span><span class="c1"># ID do API da Vagalume</span><span class="w">
+</span><span class="n">key_vagalume</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"XXXXXXXXXXXXXXXXXXXXXXX"</span><span class="w"> </span><span class="c1"># Insira sua ID do Vagalume</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Agora chega uma parte mais complicada. Não há uma conexão direta das
+músicas do Spotify com o Vagalume, isso gera duas dificuldades:</p>
+
+<p>1- A playlist do Spotify obviamente não existe no Vagalume, então nós
+temos apenas um conjunto de músicas e artistas para fazer a busca no
+Vagalume,</p>
+
+<p>2- A falta de um id obriga que a relação entre as duas bases seja
+realizada pelo nome da música, e já antecipamos que os nomes (tanto de
+artistas como de músicas) nem sempre estão iguais.</p>
+
+<p>Para a primeira parte, de busca das músicas para download das letras,
+não encontramos uma alternativa de busca por nome da música, apenas por
+álbum ou por artista.</p>
+
+<p>Assim, decidimos gerar uma lista de todos os artistas relacionados nas
+400 músicas do Spotify, baixar as letras de todas as suas músicas e, por
+fim, filtrar apenas as músicas que constam na lista do Spotify.</p>
+
+<p>É verdade que esta parte não parece muito eficiente, mas, por ora, não
+encontramos saída mais ágil para o download das músicas.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Exportando a lista de artistas das músicas</span><span class="w">
+</span><span class="n">artista</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">do.call</span><span class="p">(</span><span class="n">rbind.data.frame</span><span class="p">,</span><span class="w"> </span><span class="n">playlist_audio_features</span><span class="o">$</span><span class="n">track.artists</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">select</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="n">name</span><span class="p">)</span><span class="w">
+</span><span class="n">artista</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">artista</span><span class="p">[</span><span class="o">!</span><span class="n">duplicated</span><span class="p">(</span><span class="n">artista</span><span class="o">$</span><span class="n">id</span><span class="p">),]</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Um ponto importante para esta etapa e também para as futuras buscas e
+relações por músicas e artistas é a remoção dos acentos. Há alguns
+pacotes para isso, mas neste caso acabamos usando uma função própria
+para remoção dos acentos.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">rm_accent</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">str</span><span class="p">,</span><span class="n">pattern</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+
+  
+  </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="nf">is.character</span><span class="p">(</span><span class="n">str</span><span class="p">))</span><span class="w">
+    </span><span class="n">str</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.character</span><span class="p">(</span><span class="n">str</span><span class="p">)</span><span class="w">
+  
+  </span><span class="n">pattern</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">unique</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span><span class="w">
+  
+  </span><span class="k">if</span><span class="p">(</span><span class="nf">any</span><span class="p">(</span><span class="n">pattern</span><span class="o">==</span><span class="s2">"Ç"</span><span class="p">))</span><span class="w">
+    </span><span class="n">pattern</span><span class="p">[</span><span class="n">pattern</span><span class="o">==</span><span class="s2">"Ç"</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="s2">"ç"</span><span class="w">
+  
+  </span><span class="n">symbols</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="w">
+    </span><span class="n">acute</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"áéíóúÁÉÍÓÚýÝ"</span><span class="p">,</span><span class="w">
+    </span><span class="n">grave</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"àèìòùÀÈÌÒÙ"</span><span class="p">,</span><span class="w">
+    </span><span class="n">circunflex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"âêîôûÂÊÎÔÛ"</span><span class="p">,</span><span class="w">
+    </span><span class="n">tilde</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ãõÃÕñÑ"</span><span class="p">,</span><span class="w">
+    </span><span class="n">umlaut</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"äëïöüÄËÏÖÜÿ"</span><span class="p">,</span><span class="w">
+    </span><span class="n">cedil</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"çÇ"</span><span class="w">
+  </span><span class="p">)</span><span class="w">
+  
+  </span><span class="n">nudeSymbols</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="w">
+    </span><span class="n">acute</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aeiouAEIOUyY"</span><span class="p">,</span><span class="w">
+    </span><span class="n">grave</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aeiouAEIOU"</span><span class="p">,</span><span class="w">
+    </span><span class="n">circunflex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aeiouAEIOU"</span><span class="p">,</span><span class="w">
+    </span><span class="n">tilde</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aoAOnN"</span><span class="p">,</span><span class="w">
+    </span><span class="n">umlaut</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aeiouAEIOUy"</span><span class="p">,</span><span class="w">
+    </span><span class="n">cedil</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cC"</span><span class="w">
+  </span><span class="p">)</span><span class="w">
+  
+  </span><span class="n">accentTypes</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"´"</span><span class="p">,</span><span class="s2">"`"</span><span class="p">,</span><span class="s2">"^"</span><span class="p">,</span><span class="s2">"~"</span><span class="p">,</span><span class="s2">"¨"</span><span class="p">,</span><span class="s2">"ç"</span><span class="p">)</span><span class="w">
+  
+  </span><span class="k">if</span><span class="p">(</span><span class="nf">any</span><span class="p">(</span><span class="nf">c</span><span class="p">(</span><span class="s2">"all"</span><span class="p">,</span><span class="s2">"al"</span><span class="p">,</span><span class="s2">"a"</span><span class="p">,</span><span class="s2">"todos"</span><span class="p">,</span><span class="s2">"t"</span><span class="p">,</span><span class="s2">"to"</span><span class="p">,</span><span class="s2">"tod"</span><span class="p">,</span><span class="s2">"todo"</span><span class="p">)</span><span class="o">%in%</span><span class="n">pattern</span><span class="p">))</span><span class="w"> 
+    </span><span class="nf">return</span><span class="p">(</span><span class="n">chartr</span><span class="p">(</span><span class="n">paste</span><span class="p">(</span><span class="n">symbols</span><span class="p">,</span><span class="w"> </span><span class="n">collapse</span><span class="o">=</span><span class="s2">""</span><span class="p">),</span><span class="w">
+                  </span><span class="n">paste</span><span class="p">(</span><span class="n">nudeSymbols</span><span class="p">,</span><span class="w"> </span><span class="n">collapse</span><span class="o">=</span><span class="s2">""</span><span class="p">),</span><span class="w"> </span><span class="n">str</span><span class="p">))</span><span class="w">
+  
+  </span><span class="k">for</span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">which</span><span class="p">(</span><span class="n">accentTypes</span><span class="o">%in%</span><span class="n">pattern</span><span class="p">))</span><span class="w">
+    </span><span class="n">str</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">chartr</span><span class="p">(</span><span class="n">symbols</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="n">nudeSymbols</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">str</span><span class="p">)</span><span class="w">
+  
+  </span><span class="nf">return</span><span class="p">(</span><span class="n">str</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Agora, com a função de remover acentos, podemos gerar um loop para
+padronização do nome dos artistas e download das letras de cada um.</p>
+
+<p>Vale mencionar que o loop abaixo vai gerar vários erros que vão
+interrompendo o download. Isto se deve à diferença dos nomes dos
+artistas na base do Spotify com a base do Vagalume, um exemplo claro é
+da dupla Sandy e Júnior, que na base do Vagalume consta sandy-junior
+(sem o e). Quando isso ocorrer, uma dica é ir diretamente ao site do
+Vagalume, procurar o nome do artista na seção de busca e verificar como
+consta a url da página do artista.</p>
+
+<p>Deixamos duas linhas comentadas no código, a primeira é uma forma de
+renomear o artista e a segunda é o código de remoção do artista, quando
+não é encontrado um similar na base do Vagalume.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#Baixando as letras de todas as músicas para cada artista da lista</span><span class="w">
+</span><span class="n">songs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">()</span><span class="w">
+
+</span><span class="k">for</span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">artista</span><span class="p">[,</span><span class="m">2</span><span class="p">]){</span><span class="w">
+  </span><span class="n">autor</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">rm_accent</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="w">
+  </span><span class="n">autor</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">gsub</span><span class="p">(</span><span class="s2">" "</span><span class="p">,</span><span class="s2">"-"</span><span class="p">,</span><span class="n">autor</span><span class="p">)</span><span class="w">
+  </span><span class="n">autor</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">gsub</span><span class="p">(</span><span class="s2">"&amp;"</span><span class="p">,</span><span class="s2">"e"</span><span class="p">,</span><span class="n">autor</span><span class="p">)</span><span class="w">
+  </span><span class="n">autor</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">gsub</span><span class="p">(</span><span class="s1">'\\.'</span><span class="p">,</span><span class="s1">''</span><span class="p">,</span><span class="n">autor</span><span class="p">)</span><span class="w">
+  </span><span class="n">song</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">autor</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">purrr</span><span class="o">::</span><span class="n">map_dfr</span><span class="p">(</span><span class="n">songNames</span><span class="p">)</span><span class="w">
+  </span><span class="n">songs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">rbind</span><span class="p">(</span><span class="n">songs</span><span class="p">,</span><span class="n">song</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="c1">#Possíveis ajustes que precisam ser realizados nos nomes</span><span class="w">
+</span><span class="c1"># artista[artista$name=="Abel Ferreira E Seu Conjunto",2] &lt;- 'Abel Ferreira'</span><span class="w">
+</span><span class="c1"># artista &lt;- artista[!artista$name=="Garoto",]</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Com a base de letras dos artistas, agora temos que filtrar esta base
+apenas para as músicas listadas na base original. Como comentamos acima,
+o único link entre o download das letras com a lista do Spotify é o nome
+da música, então é recomendável fazer um tratamento dos caracteres para
+letras minúsculas e sem acento.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Eliminando maiúsculas e acentos das duas bases de conexão</span><span class="w">
+</span><span class="n">songs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">songs</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">mutate</span><span class="p">(</span><span class="n">songsac</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">str_to_lower</span><span class="p">(</span><span class="n">song</span><span class="p">))</span><span class="w">
+</span><span class="n">songs</span><span class="o">$</span><span class="n">songsac</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">rm_accent</span><span class="p">(</span><span class="n">songs</span><span class="o">$</span><span class="n">songsac</span><span class="p">)</span><span class="w">
+
+</span><span class="n">lista</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">playlist_audio_features</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">mutate</span><span class="p">(</span><span class="n">songsac</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">str_to_lower</span><span class="p">(</span><span class="n">track.name</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">select</span><span class="p">(</span><span class="n">playlist_name</span><span class="p">,</span><span class="n">songsac</span><span class="p">)</span><span class="w">
+</span><span class="n">lista</span><span class="o">$</span><span class="n">songsac</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">rm_accent</span><span class="p">(</span><span class="n">lista</span><span class="o">$</span><span class="n">songsac</span><span class="p">)</span><span class="w">
+
+</span><span class="n">letraemusica</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lista</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">inner_join</span><span class="p">(</span><span class="n">songs</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'songsac'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">distinct</span><span class="p">(</span><span class="n">songsac</span><span class="p">,</span><span class="w"> </span><span class="n">.keep_all</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Perdemos cerca de 140 musicas aqui, sendo que 31 somente da década de</p>
+<ol>
+  <li>o que não é muito legal. Para tentar minimizar isto, podemos usar
+uma medida de distância entre as listas de músicas, para corrigir
+manualmente alguns nomes que não estão dando match.</li>
+</ol>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#Nomes para corrigir</span><span class="w">
+</span><span class="n">nomes_corrigir</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lista</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">anti_join</span><span class="p">(</span><span class="n">songs</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'songsac'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">distinct</span><span class="p">(</span><span class="n">songsac</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pull</span><span class="p">(</span><span class="n">songsac</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># Calculando as 'distâncias' entre as músicas da base de letras e as que deram unmatch</span><span class="w">
+</span><span class="n">dists</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">songs</span><span class="o">$</span><span class="n">songsac</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">map</span><span class="p">(</span><span class="n">levenshteinSim</span><span class="p">,</span><span class="w"> </span><span class="n">str1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nomes_corrigir</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># Encontrando os nomes de músicas mais similares nas duas bases</span><span class="w">
+</span><span class="n">ordered_dists</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">dists</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">map_dbl</span><span class="p">(</span><span class="n">max</span><span class="p">)</span><span class="w">
+</span><span class="n">max_dists</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">dists</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">map_dbl</span><span class="p">(</span><span class="n">which.max</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># Filtrando as que tem similaridade &gt; 0.70</span><span class="w">
+</span><span class="n">indexes_min_dist</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">which</span><span class="p">(</span><span class="n">ordered_dists</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="m">0.70</span><span class="p">)</span><span class="w">
+</span><span class="n">songs_min_dist</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">songs</span><span class="o">$</span><span class="n">songsac</span><span class="p">[</span><span class="n">indexes_min_dist</span><span class="p">]</span><span class="w">
+</span><span class="n">index_lyrics</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">max_dists</span><span class="p">[</span><span class="n">which</span><span class="p">(</span><span class="n">ordered_dists</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="m">0.70</span><span class="p">)]</span><span class="w">
+
+</span><span class="c1"># Salvando as mais similares em um data.frame </span><span class="w">
+</span><span class="n">results_dist</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">from_lista</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nomes_corrigir</span><span class="p">[</span><span class="n">index_lyrics</span><span class="p">],</span><span class="w">
+                          </span><span class="n">from_songs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">songs_min_dist</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># Corrigindo os nomes de algumas musicas</span><span class="w">
+</span><span class="n">songs</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">songs</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">mutate</span><span class="p">(</span><span class="n">songsac</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">case_when</span><span class="p">(</span><span class="w"> 
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'era um garoto que como eu amava os beatles e os rolling stones'</span><span class="w"> </span><span class="o">~</span><span class="w"> 
+          </span><span class="s1">'era um garoto, que como eu, amava os beatles e os rolling stones'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'maria, maria'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'maria maria'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'como uma onda (zen surfismo)'</span><span class="w"> </span><span class="o">~</span><span class="w">
+          </span><span class="s1">'como uma onda - zen-surfismo'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'recuerdos de ypacarai'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'recordacoes de ypacaray'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'roda viva'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'roda-viva'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'mas que nada'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'mas, que nada!'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'o que e o que e ?'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'o que e o que e?'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'mulher rendeira'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'mule rendeira'</span><span class="p">,</span><span class="w">
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'mon amour, meu bem, ma femme'</span><span class="w"> </span><span class="o">~</span><span class="w">
+          </span><span class="s1">'mon amour, meu bem, ma famme'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'descobridor dos sete mares'</span><span class="w"> </span><span class="o">~</span><span class="w"> 
+          </span><span class="s1">'o descobridor dos sete mares'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'apenas um rapaz latino-americano'</span><span class="w"> </span><span class="o">~</span><span class="w">
+          </span><span class="s1">'apenas um rapaz latino americano'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'meu sangue ferve por voce'</span><span class="w"> </span><span class="o">~</span><span class="w">
+          </span><span class="s1">'meu sangue ferve for voce'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'amor, meu grande amor'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'amor meu grande amor'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'dancing days'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s2">"dancin' days"</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'colcha de retalhos'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'colcha de retalho'</span><span class="p">,</span><span class="w">  
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'araketu bom demais'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'ara ketu bom demais'</span><span class="p">,</span><span class="w">
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'vermelho (part. david assayag)'</span><span class="w"> </span><span class="o">~</span><span class="w"> 
+          </span><span class="s1">'vermelho (feat. david assayag)'</span><span class="p">,</span><span class="w"> 
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'a casa amarela'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'casa amarela'</span><span class="p">,</span><span class="w">
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'que sorte a nossa'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'que sorte a nossa - live'</span><span class="p">,</span><span class="w">
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'ninguem explica deus (part. gabriela rocha)'</span><span class="w"> </span><span class="o">~</span><span class="w">
+          </span><span class="s1">'ninguem explica deus (feat. gabriela rocha) - ao vivo'</span><span class="p">,</span><span class="w">
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'localiza ai'</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="s1">'localiza ai bb'</span><span class="p">,</span><span class="w">
+        </span><span class="n">songsac</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'faking love (ft. saweetie)'</span><span class="w"> </span><span class="o">~</span><span class="w">
+          </span><span class="s1">'faking love (feat. saweetie)'</span><span class="p">,</span><span class="w">
+        </span><span class="kc">TRUE</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="n">songsac</span><span class="p">))</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Agora, com a correção destes nomes, podemos refazer a conexão das
+músicas entre as duas bases e já realizar a busca das letras das músicas
+pelo pacote do Vagalume.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Refazendo a inner join com os nomes corrigidos</span><span class="w">
+</span><span class="n">letraemusica</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lista</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">inner_join</span><span class="p">(</span><span class="n">songs</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'songsac'</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">distinct</span><span class="p">(</span><span class="n">songsac</span><span class="p">,</span><span class="w"> </span><span class="n">.keep_all</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span><span class="w">
+
+
+</span><span class="c1"># Baixando as letras das musicas</span><span class="w">
+</span><span class="n">lyrics</span><span class="w"> </span><span class="o">&lt;-</span><span class="w">  </span><span class="n">letraemusica</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">pull</span><span class="p">(</span><span class="n">song.id</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">map</span><span class="p">(</span><span class="n">lyrics</span><span class="p">,</span><span class="w"> </span><span class="n">artist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"name"</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">key_vagalume</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">map_dfr</span><span class="p">(</span><span class="n">data.frame</span><span class="p">)</span><span class="w"> 
+
+</span><span class="c1"># Inserir dados das playlists na base lyrics</span><span class="w">
+</span><span class="n">lyrics</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">left_join</span><span class="p">(</span><span class="n">lyrics</span><span class="p">[,</span><span class="o">-</span><span class="nf">c</span><span class="p">(</span><span class="m">2</span><span class="p">,</span><span class="m">3</span><span class="p">,</span><span class="m">6</span><span class="o">:</span><span class="m">8</span><span class="p">)],</span><span class="n">letraemusica</span><span class="p">[,</span><span class="m">-3</span><span class="p">])</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="análise-das-letras-das-músicas">Análise das letras das músicas</h2>
+
+<p>Com as duas bases conectadas, agora podemos fazer análise das letras das
+músicas por década. Para isso, precisaremos de mais alguns pacotes
+adicionais.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">library</span><span class="p">(</span><span class="n">tidytext</span><span class="p">)</span><span class="w"> </span><span class="c1"># Para manipulação dos dados de texto</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">lexiconPT</span><span class="p">)</span><span class="w"> </span><span class="c1"># Para download de stopwords e sentimento das palavras</span><span class="w">
+</span><span class="n">library</span><span class="p">(</span><span class="n">wordcloud</span><span class="p">)</span><span class="w"> </span><span class="c1"># Para gerar wordclouds</span><span class="w">
+</span></code></pre></div></div>
+
+<p>A avaliação das letras também é mais eficaz quando eliminamos os acentos
+e trabalhamos apenas com letras minúsculas, então o primeiro passo é
+realizar uma limpeza dos dados e também para separá-las individualmente.</p>
+
+<p>Já inserimos também uma sequência de comandos para gerar stopwords e
+elimná-las da lista.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Colocando todas as palavras em minúsculo e retirando os acentos</span><span class="w">
+</span><span class="n">lyrics</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lyrics</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">mutate</span><span class="p">(</span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">str_to_lower</span><span class="p">(</span><span class="n">text</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">mutate</span><span class="p">(</span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rm_accent</span><span class="p">(</span><span class="n">text</span><span class="p">))</span><span class="w">
+
+</span><span class="c1"># Baixando uma lista de stopwords em pt</span><span class="w">
+</span><span class="n">stopwords</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">(</span><span class="n">word</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tm</span><span class="o">::</span><span class="n">stopwords</span><span class="p">(</span><span class="s1">'portuguese'</span><span class="p">))</span><span class="w">
+
+</span><span class="c1"># Em alguns casos vimos uma mensagem de remoção da letra no site do Vagalume</span><span class="w">
+</span><span class="n">lyrics</span><span class="o">$</span><span class="n">drop</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">grepl</span><span class="p">(</span><span class="s2">"a musica de autoria"</span><span class="p">,</span><span class="n">lyrics</span><span class="o">$</span><span class="n">text</span><span class="p">)</span><span class="w">
+</span><span class="n">lyrics</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lyrics</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">filter</span><span class="p">(</span><span class="n">drop</span><span class="o">==</span><span class="kc">FALSE</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">select</span><span class="p">(</span><span class="o">-</span><span class="n">drop</span><span class="p">)</span><span class="w">
+
+</span><span class="c1">#Criando data frame vazio para inserir as palavras por ano</span><span class="w">
+</span><span class="n">unnested</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data.frame</span><span class="p">()</span><span class="w">
+
+</span><span class="c1"># Quebrando as frases em palavras e removendo as stopwords</span><span class="w">
+</span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">unique</span><span class="p">(</span><span class="n">lyrics</span><span class="o">$</span><span class="n">playlist_name</span><span class="p">)){</span><span class="w">
+  </span><span class="n">unnest</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lyrics</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">filter</span><span class="p">(</span><span class="n">playlist_name</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">select</span><span class="p">(</span><span class="n">text</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">unnest_tokens</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="n">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ngrams"</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">anti_join</span><span class="p">(</span><span class="n">stopwords</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"word"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"word"</span><span class="p">))</span><span class="w">
+  </span><span class="n">unnest</span><span class="o">$</span><span class="n">decada</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">i</span><span class="w">
+  </span><span class="n">unnested</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">rbind</span><span class="p">(</span><span class="n">unnested</span><span class="p">,</span><span class="n">unnest</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Agora podemos começar as análises das palavras mais comuns e do
+sentimento das músicas.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Contando as palavras que mais apareceram</span><span class="w">
+</span><span class="n">unnested</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">group_by</span><span class="p">(</span><span class="n">decada</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">
+  </span><span class="n">count</span><span class="p">(</span><span class="n">word</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w">   
+  </span><span class="n">arrange</span><span class="p">(</span><span class="n">desc</span><span class="p">(</span><span class="n">n</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">slice</span><span class="p">(</span><span class="m">1</span><span class="o">:</span><span class="m">10</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># Para gerar uma lista das palavras mais comuns por década,</span><span class="w">
+</span><span class="c1"># podemos criar uma função para facilitar a repetição</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">ano</span><span class="p">){</span><span class="w">
+    </span><span class="n">unnested</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">filter</span><span class="p">(</span><span class="n">decada</span><span class="o">==</span><span class="n">paste0</span><span class="p">(</span><span class="s1">'Brasil Anos '</span><span class="p">,</span><span class="n">ano</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+    </span><span class="n">count</span><span class="p">(</span><span class="n">word</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+    </span><span class="c1"># tirar palavras que aparecem pouco</span><span class="w">
+    </span><span class="c1">#filter(n &lt; quantile(n, 0.999)) %&gt;%</span><span class="w">
+    </span><span class="n">top_n</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+    </span><span class="n">ggplot</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">reorder</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">),</span><span class="w"> </span><span class="n">n</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">geom_linerange</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">ymin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">n</span><span class="p">),</span><span class="w"> </span><span class="n">ymax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reorder</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">)),</span><span class="w">
+                   </span><span class="n">position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">position_dodge</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.2</span><span class="p">),</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> 
+                   </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'darksalmon'</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
+    </span><span class="n">geom_point</span><span class="p">(</span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'dodgerblue4'</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.9</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">coord_flip</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">paste0</span><span class="p">(</span><span class="s1">'Top 30 palavras mais comuns na década de '</span><span class="p">,</span><span class="n">ano</span><span class="p">),</span><span class="w">
+         </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'Contagem'</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+    </span><span class="n">theme_bw</span><span class="p">(</span><span class="m">14</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">1950</span><span class="p">)</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">1960</span><span class="p">)</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">1970</span><span class="p">)</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">1980</span><span class="p">)</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">1990</span><span class="p">)</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">2000</span><span class="p">)</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">2010</span><span class="p">)</span><span class="w">
+</span><span class="n">palavras_comuns</span><span class="p">(</span><span class="m">2020</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Podemos também criar uma função para gerar as wordclouds de cada década.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wordcloud_ano</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">ano</span><span class="p">){</span><span class="w">
+  </span><span class="n">unnested</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">filter</span><span class="p">(</span><span class="n">decada</span><span class="o">==</span><span class="n">paste0</span><span class="p">(</span><span class="s1">'Brasil Anos '</span><span class="p">,</span><span class="n">ano</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+    </span><span class="n">count</span><span class="p">(</span><span class="n">word</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+    </span><span class="n">with</span><span class="p">(</span><span class="n">wordcloud</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"serif"</span><span class="p">,</span><span class="w"> 
+                   </span><span class="n">random.order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">,</span><span class="w"> </span><span class="n">max.words</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="p">,</span><span class="w"> 
+                   </span><span class="n">colors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"darksalmon"</span><span class="p">,</span><span class="w"> </span><span class="s2">"dodgerblue4"</span><span class="p">)))</span><span class="w">
+
+</span><span class="p">}</span><span class="w">
+
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">1950</span><span class="p">)</span><span class="w">
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">1960</span><span class="p">)</span><span class="w">
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">1970</span><span class="p">)</span><span class="w">
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">1980</span><span class="p">)</span><span class="w">
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">1990</span><span class="p">)</span><span class="w">
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">2000</span><span class="p">)</span><span class="w">
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">2010</span><span class="p">)</span><span class="w">
+</span><span class="n">wordcloud_ano</span><span class="p">(</span><span class="m">2020</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<p>A avaliação do sentimento das músicas por década pode ser feita de forma
+muito parecida com as funções acima.</p>
+
+<div class="language-r highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Buscando os sentimentos do pacote lexiconPT</span><span class="w">
+</span><span class="n">sentiments</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">oplexicon_v2.1</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">mutate</span><span class="p">(</span><span class="n">word</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">term</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">select</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">polarity</span><span class="p">)</span><span class="w">
+
+</span><span class="c1"># Juntando os sentimentos com as palavras presentes nas músicas</span><span class="w">
+</span><span class="n">add_sentiments</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lyrics</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">select</span><span class="p">(</span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="n">playlist_name</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">group_by_all</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">slice</span><span class="p">(</span><span class="m">1</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">ungroup</span><span class="p">()</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">unnest_tokens</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">text</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">anti_join</span><span class="p">(</span><span class="n">stopwords</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"word"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"word"</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">inner_join</span><span class="p">(</span><span class="n">sentiments</span><span class="p">,</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s2">"word"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"word"</span><span class="p">))</span><span class="w">
+
+
+</span><span class="n">sentimento_ano</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="k">function</span><span class="p">(</span><span class="n">ano</span><span class="p">){</span><span class="w">
+</span><span class="n">add_sentiments</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> </span><span class="n">filter</span><span class="p">(</span><span class="n">playlist_name</span><span class="o">==</span><span class="n">paste0</span><span class="p">(</span><span class="s1">'Brasil Anos '</span><span class="p">,</span><span class="n">ano</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">group_by</span><span class="p">(</span><span class="n">polarity</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">count</span><span class="p">(</span><span class="n">word</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">filter</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">quantile</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="m">0.999</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">top_n</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">15</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">ggplot</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">reorder</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">),</span><span class="w"> </span><span class="n">n</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_linerange</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">ymin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">n</span><span class="p">),</span><span class="w"> </span><span class="n">ymax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reorder</span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">)),</span><span class="w">
+                 </span><span class="n">position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">position_dodge</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.2</span><span class="p">),</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> 
+                 </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'darksalmon'</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
+  </span><span class="n">geom_point</span><span class="p">(</span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'dodgerblue4'</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.9</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">facet_wrap</span><span class="p">(</span><span class="o">~</span><span class="n">polarity</span><span class="p">,</span><span class="w"> </span><span class="n">scales</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"free"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">coord_flip</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'Top 15 palavras mais comuns'</span><span class="p">,</span><span class="w"> 
+       </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'Contagens'</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Sentimentos"</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_bw</span><span class="p">(</span><span class="m">14</span><span class="p">)</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">1950</span><span class="p">)</span><span class="w">
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">1960</span><span class="p">)</span><span class="w">
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">1970</span><span class="p">)</span><span class="w">
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">1980</span><span class="p">)</span><span class="w">
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">1990</span><span class="p">)</span><span class="w">
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">2000</span><span class="p">)</span><span class="w">
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">2010</span><span class="p">)</span><span class="w">
+</span><span class="n">sentimento_ano</span><span class="p">(</span><span class="m">2020</span><span class="p">)</span><span class="w">
+
+
+</span><span class="c1"># Gera uma lista agregada do sentimento por década</span><span class="w">
+</span><span class="n">summ</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">add_sentiments</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">group_by</span><span class="p">(</span><span class="n">playlist_name</span><span class="p">)</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">summarise</span><span class="p">(</span><span class="n">mean_pol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mean</span><span class="p">(</span><span class="n">polarity</span><span class="p">))</span><span class="w"> 
+
+</span><span class="c1"># Plota o resultado da média de sentimento das músicas por década</span><span class="w">
+</span><span class="n">summ</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">arrange</span><span class="p">(</span><span class="n">desc</span><span class="p">(</span><span class="n">mean_pol</span><span class="p">))</span><span class="w"> </span><span class="o">%&gt;%</span><span class="w"> 
+  </span><span class="n">ggplot</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">reorder</span><span class="p">(</span><span class="n">playlist_name</span><span class="p">,</span><span class="w"> </span><span class="n">mean_pol</span><span class="p">),</span><span class="w"> </span><span class="n">mean_pol</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">geom_linerange</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">ymin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">mean_pol</span><span class="p">),</span><span class="w"> </span><span class="n">ymax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mean_pol</span><span class="p">,</span><span class="w"> 
+                     </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reorder</span><span class="p">(</span><span class="n">playlist_name</span><span class="p">,</span><span class="w"> </span><span class="n">mean_pol</span><span class="p">)),</span><span class="w">
+                 </span><span class="n">position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">position_dodge</span><span class="p">(</span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.2</span><span class="p">),</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> 
+                 </span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'darksalmon'</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> 
+  </span><span class="n">geom_point</span><span class="p">(</span><span class="n">colour</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'dodgerblue4'</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.9</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">labs</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'Músicas'</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'Sentimento'</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w">
+  </span><span class="n">theme_bw</span><span class="p">(</span><span class="m">14</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="referências">Referências</h2>
+
+<p>Wundervald, Bruna and Trecenti, Julio, Music Data Analysis in R. Acesso:
+<a href="https://github.com/brunaw/SER2019">https://github.com/brunaw/SER2019</a>, 2019. }</p>
+:ET
